@@ -1,12 +1,14 @@
 package io.github.fabricetheytaz.schema.org.database;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Properties;
 import org.apache.commons.lang3.function.FailableBiConsumer;
 import com.google.gson.Gson;
 import io.github.fabricetheytaz.schema.org.Thing;
@@ -23,33 +25,35 @@ public class SchemaOrgDatabase implements AutoCloseable
 
 	private static final String CONNECTION_STRING = "jdbc:sqlite:%s";
 
-	private static final String SQL_INSERT_THING = "INSERT INTO `thing` (`json`) VALUES (JSON(?))";
+	private static final String SQL_INSERT_THING = "INSERT INTO `thing` (`type`, `json`) VALUES (?, JSON(?))";
 	private static final String SQL_SELECT_THINGS_JSON = "SELECT `json` FROM `thing`";
-	//private static final String SQL_SELECT_THINGS = "SELECT `id`, JSON_EXTRACT(`json`, '$.@type') AS 'type', `json` FROM `thing`";
-	private static final String SQL_SELECT_THINGS_BY_TYPE = "SELECT `id`, JSON_EXTRACT(`json`, '$.@type') AS 'type', `json` FROM `thing` WHERE `type` = ?";
+	//private static final String SQL_SELECT_THINGS_BY_TYPE = "SELECT `id`, JSON_EXTRACT(`json`, '$.@type') AS 'type', `json` FROM `thing` WHERE `type` = ?";
+	private static final String SQL_SELECT_THINGS_BY_TYPE = "SELECT `id`, `json` FROM `thing` WHERE `type` = ?";
+	private static final String SQL_UPDATE_THINGS_IDS = "UPDATE `thing` SET `json` = JSON_SET(`json`, '$.@id', `id`)";
 
 	private final Connection connection;
 
 	/**
 	 * @since 0.1.0
 	 */
-	public SchemaOrgDatabase(final String path) throws SQLException
+	public SchemaOrgDatabase() throws IOException, SQLException
 		{
 		super();
 
-		connection = DriverManager.getConnection(String.format(CONNECTION_STRING, notNull(path)));
+		connection = DriverManager.getConnection(String.format(CONNECTION_STRING, getDatabasePath()));
 		}
 
 	/**
 	 * @since 0.1.0
 	 */
-	public final int insert(final Thing thing, final FailableBiConsumer<Integer, Thing, IOException> consumer) throws SQLException, IOException
+	public final <T extends Thing> boolean insert(final T thing, final FailableBiConsumer<Integer, T, IOException> consumer) throws IOException, SQLException
 		{
 		final String json = GSON.toJson(notNull(thing));
 
 		try (final PreparedStatement statement = connection.prepareStatement(SQL_INSERT_THING, Statement.RETURN_GENERATED_KEYS))
 			{
-			statement.setString(1, json);
+			statement.setString(1, thing.getType());
+			statement.setString(2, json);
 
 			final int count = statement.executeUpdate();
 
@@ -58,14 +62,14 @@ public class SchemaOrgDatabase implements AutoCloseable
 				consumer.accept(getLastInsertId(statement), thing);
 				}
 
-			return count;
+			return (count == 1);
 			}
 		}
 
 	/**
 	 * @since 0.1.0
 	 */
-	public final int insert(final Thing thing) throws SQLException, IOException
+	public final <T extends Thing> boolean insert(final T thing) throws IOException, SQLException
 		{
 		return insert(thing, null);
 		}
@@ -73,7 +77,7 @@ public class SchemaOrgDatabase implements AutoCloseable
 	/**
 	 * @since 0.1.0
 	 */
-	public final <T extends Thing> void getAll(final Class<T> classOfT, final FailableBiConsumer<Integer, T, IOException> consumer) throws SQLException, IOException
+	public final <T extends Thing> void getAll(final Class<T> classOfT, final FailableBiConsumer<Integer, T, IOException> consumer) throws IOException, SQLException
 		{
 		notNull(classOfT);
 		notNull(consumer);
@@ -100,7 +104,7 @@ public class SchemaOrgDatabase implements AutoCloseable
 	/**
 	 * @since 0.1.0
 	 */
-	public String getAllAsJSON() throws SQLException
+	public final String getAllAsJSON() throws SQLException
 		{
 		final StringBuilder json = new StringBuilder();
 
@@ -126,13 +130,21 @@ public class SchemaOrgDatabase implements AutoCloseable
 				}
 			}
 
-		// Supprimer la dernière virgule :) et \n
+		// Supprimer la dernière virgule et \n :)
 		json.deleteCharAt(json.length() - 1);
 		json.deleteCharAt(json.length() - 1);
 
 		json.append("\n]");
 
 		return json.toString();
+		}
+
+	/**
+	 * @since 0.1.0
+	 */
+	public final int updateIDs() throws SQLException
+		{
+		return connection.createStatement().executeUpdate(SQL_UPDATE_THINGS_IDS);
 		}
 
 	/**
@@ -155,15 +167,28 @@ public class SchemaOrgDatabase implements AutoCloseable
 	 * @since 0.1.0
 	 */
 	@Override
-	public final void close()
+	public final void close() throws SQLException
 		{
-		try
+		connection.close();
+		}
+
+	/**
+	 * @since 0.1.0
+	 */
+	private static final String getDatabasePath() throws IOException
+		{
+		try (final InputStream stream = SchemaOrgDatabase.class.getResourceAsStream("/resources/config.properties"))
 			{
-			connection.close();
+			final Properties properties = new Properties();
+
+			properties.load(stream);
+
+			return properties.getProperty("path");
 			}
-		catch (final SQLException ex)
-			{
-			throw new RuntimeException(ex);
-			}
+		}
+
+	public static void main(String[] args) throws Exception
+		{
+		//try (SchemaOrgDatabase database = new SchemaOrgDatabase()){}
 		}
 	}
