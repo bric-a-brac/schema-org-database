@@ -1,14 +1,14 @@
 package io.github.fabricetheytaz.schema.org.database;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Properties;
+import java.util.StringJoiner;
+import java.util.prefs.Preferences;
 import org.apache.commons.lang3.function.FailableBiConsumer;
 import com.google.gson.Gson;
 import io.github.fabricetheytaz.schema.org.Thing;
@@ -36,11 +36,19 @@ public class SchemaOrgDatabase implements AutoCloseable
 	/**
 	 * @since 0.1.0
 	 */
-	public SchemaOrgDatabase() throws IOException, SQLException
+	public SchemaOrgDatabase() throws SQLException
+		{
+		this(getDatabasePath());
+		}
+
+	/**
+	 * @since 0.1.0
+	 */
+	public SchemaOrgDatabase(final String path) throws SQLException
 		{
 		super();
 
-		connection = DriverManager.getConnection(String.format(CONNECTION_STRING, getDatabasePath()));
+		connection = DriverManager.getConnection(String.format(CONNECTION_STRING, notNull(path)));
 		}
 
 	/**
@@ -106,6 +114,10 @@ public class SchemaOrgDatabase implements AutoCloseable
 	 */
 	public final String getAllAsJSON() throws SQLException
 		{
+		// TODO: Tester StringJoiner
+		@SuppressWarnings("unused")
+		final StringJoiner joiner = new StringJoiner(",", "[", "]");
+
 		final StringBuilder json = new StringBuilder();
 
 		json.append("[\n");
@@ -175,20 +187,11 @@ public class SchemaOrgDatabase implements AutoCloseable
 	/**
 	 * @since 0.1.0
 	 */
-	private static final String getDatabasePath() throws IOException
+	private static final String getDatabasePath()
 		{
-		try (final InputStream stream = SchemaOrgDatabase.class.getResourceAsStream("/resources/config.properties"))
-			{
-			final Properties properties = new Properties();
+		final Preferences preferences = Preferences.userNodeForPackage(SchemaOrgDatabase.class);
 
-			properties.load(stream);
-
-			return properties.getProperty("path");
-			}
-		}
-
-	public static void main(String[] args) throws Exception
-		{
-		//try (SchemaOrgDatabase database = new SchemaOrgDatabase()){}
+		// FIXME: Error si null !!
+		return preferences.get("path", null);
 		}
 	}
