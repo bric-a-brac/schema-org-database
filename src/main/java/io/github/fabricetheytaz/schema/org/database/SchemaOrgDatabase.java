@@ -88,6 +88,24 @@ public class SchemaOrgDatabase implements AutoCloseable
 	/**
 	 * @since 0.1.0
 	 */
+	public final int getCount() throws SQLException
+		{
+		final Statement statement = connection.createStatement();
+
+		try (final ResultSet things = statement.executeQuery("SELECT COUNT(*) AS 'total' FROM `thing`"))
+			{
+			if (things.next())
+				{
+				return things.getInt("total");
+				}
+			}
+
+		return -1;
+		}
+
+	/**
+	 * @since 0.1.0
+	 */
 	public final <T extends Thing> void getAll(final Class<T> classOfT, final FailableBiConsumer<Integer, T, IOException> consumer) throws IOException, SQLException
 		{
 		notNull(classOfT);
@@ -96,6 +114,7 @@ public class SchemaOrgDatabase implements AutoCloseable
 		final PreparedStatement statement = connection.prepareStatement(SQL_SELECT_THINGS_BY_TYPE);
 
 		// FIXME: Fonctionne uniquement pour l'instant si Class = @type !!!!!!!!!
+		// TODO: Annotation.getAnnotation()... en cours dans SchemaOrg Types
 		statement.setString(1, classOfT.getSimpleName());
 
 		try (final ResultSet things = statement.executeQuery())
@@ -144,51 +163,15 @@ public class SchemaOrgDatabase implements AutoCloseable
 
 	/**
 	 * @since 0.1.0
-	 * 
-	 * @deprecated
-	 */
-	@Deprecated
-	public final String getAllAsJSON() throws SQLException
-		{
-		final StringBuilder json = new StringBuilder();
-
-		json.append("[\n");
-
-		final Statement statement = connection.createStatement();
-
-		try (final ResultSet things = statement.executeQuery(SQL_SELECT_THINGS_JSON))
-			{
-			while (things.next())
-				{
-				json.append(things.getString("json"));
-
-				/*
-				// Pas supporté par SQLite
-				if (!things.isLast())
-					{
-					json.append(",\n");
-					}
-				*/
-
-				json.append(",\n");
-				}
-			}
-
-		// Supprimer la dernière virgule et \n :)
-		json.deleteCharAt(json.length() - 1);
-		json.deleteCharAt(json.length() - 1);
-
-		json.append("\n]");
-
-		return json.toString();
-		}
-
-	/**
-	 * @since 0.1.0
 	 */
 	public final int updateIDs() throws SQLException
 		{
 		return connection.createStatement().executeUpdate(SQL_UPDATE_THINGS_IDS);
+		}
+
+	public final void query(final IQuery query) throws SQLException
+		{
+		throw new UnsupportedOperationException("SchemaOrgDatabase::query()");
 		}
 
 	/**
