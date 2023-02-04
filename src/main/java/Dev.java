@@ -11,7 +11,8 @@ public class Dev
 
 		try (SchemaOrgDatabase database = new SchemaOrgDatabase())
 			{
-			System.out.println(database.getAllAsJSON());
+			//System.out.println(database.getAllAsJSON());
+			System.out.println(database.getAll());
 			}
 		}
 	}

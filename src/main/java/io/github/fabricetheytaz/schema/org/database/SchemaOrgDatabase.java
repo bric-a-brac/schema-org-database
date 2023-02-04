@@ -8,10 +8,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.StringJoiner;
+import java.util.function.Consumer;
 import java.util.prefs.Preferences;
 import org.apache.commons.lang3.function.FailableBiConsumer;
 import com.google.gson.Gson;
-import io.github.fabricetheytaz.schema.org.Thing;
+import io.github.fabricetheytaz.schema.org.types.Thing;
 
 import static io.github.fabricetheytaz.util.Argument.notNull;
 
@@ -34,6 +35,8 @@ public class SchemaOrgDatabase implements AutoCloseable
 	private final Connection connection;
 
 	/**
+	 * Chemin pris depuis les préférences
+	 * 
 	 * @since 0.1.0
 	 */
 	public SchemaOrgDatabase() throws SQLException
@@ -112,12 +115,41 @@ public class SchemaOrgDatabase implements AutoCloseable
 	/**
 	 * @since 0.1.0
 	 */
+	public final void getAll(final Consumer<String> consumer) throws SQLException
+		{
+		notNull(consumer);
+
+		final Statement statement = connection.createStatement();
+
+		try (final ResultSet things = statement.executeQuery(SQL_SELECT_THINGS_JSON))
+			{
+			while (things.next())
+				{
+				consumer.accept(things.getString("json"));
+				}
+			}
+		}
+
+	/**
+	 * @since 0.1.0
+	 */
+	public final String getAll() throws SQLException
+		{
+		final StringJoiner array = new StringJoiner(",\n", "[\n", "\n]");
+
+		getAll(json -> array.add(json));
+
+		return array.toString();
+		}
+
+	/**
+	 * @since 0.1.0
+	 * 
+	 * @deprecated
+	 */
+	@Deprecated
 	public final String getAllAsJSON() throws SQLException
 		{
-		// TODO: Tester StringJoiner
-		@SuppressWarnings("unused")
-		final StringJoiner joiner = new StringJoiner(",", "[", "]");
-
 		final StringBuilder json = new StringBuilder();
 
 		json.append("[\n");
